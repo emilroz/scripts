@@ -103,8 +103,8 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
     print "Moving images from Dataset: %d %s to Plate: %d %s" \
         % (dataset.id, dataset.name, plate.id.val, plate.name.val)
 
-    row = 0
-    col = 0
+    row = scriptParams["Row_offset"]
+    col = scriptParams["Column_offset"]
 
     firstAxisIsRow = scriptParams["First_Axis"] == 'row'
     axisCount = scriptParams["First_Axis_Count"]
@@ -134,12 +134,12 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
         if firstAxisIsRow:
             row += 1
             if row >= axisCount:
-                row = 0
+                row = scriptParams["Row_offset"]
                 col += 1
         else:
             col += 1
             if col >= axisCount:
-                col = 0
+                col = scriptParams["Column_offset"]
                 row += 1
 
     # if user wanted to delete dataset, AND it's empty we can delete dataset
@@ -322,13 +322,21 @@ client-tutorials/insight/insight-util-scripts.html""",
             values=rowColNaming,
             description="""Name plate rows with 'number' or 'letter'"""),
 
+        scripts.Int(
+            "Column_offset", grouping="6.1", default=0,
+            description="Offset to first acquired column"),
+
+        scripts.Int(
+            "Row_offset", grouping="6.2", default=0,
+            description="Offset to first acquired row"),
+
         scripts.String(
-            "Screen", grouping="6",
+            "Screen", grouping="7",
             description="Option: put Plate(s) in a Screen. Enter Name of new"
             " screen or ID of existing screen"""),
 
         scripts.Bool(
-            "Remove_From_Dataset", grouping="7", default=True,
+            "Remove_From_Dataset", grouping="8", default=True,
             description="Remove Images from Dataset as they are added to"
             " Plate"),
 
