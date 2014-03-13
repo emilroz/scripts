@@ -33,6 +33,7 @@ This script converts a Dataset of Images to a Plate, with one image per Well.
 @since 3.0-Beta4.3
 """
 
+import re
 import omero.scripts as scripts
 from omero.gateway import BlitzGateway
 import omero.util.script_utils as script_utils
@@ -73,6 +74,22 @@ def addImageToPlate(conn, image, plateId, column, row, removeFrom=None):
         for l in links:
             conn.deleteObjectDirect(l._obj)
     return True
+
+
+def update_index(
+    row, col, start_row, start_column, max_value, firstAxisIsRow
+):
+    if firstAxisIsRow:
+        row += 1
+        if row >= max_value:
+            row = start_row
+            col += 1
+    else:
+        col += 1
+        if col >= max_value:
+            col = start_column
+            row += 1
+    return row, col
 
 
 def dataset_to_plate(conn, scriptParams, datasetId, screen):
@@ -124,23 +141,24 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
         scriptParams["Remove_From_Dataset"]
     if removeDataset:
         removeFrom = dataset
-
+    skip_list = scriptParams["Wells_to_skip"] + ","
     for image in images:
+        check = "%i:%i," % (row + 1, col + 1)
+        while re.search(check, skip_list) is not None:
+            row, col = update_index(
+                row, col, scriptParams["Row_offset"],
+                scriptParams["Column_offset"], axisCount, firstAxisIsRow
+            )
+            check = "%i:%i" % (row + 1, col + 1)
         print "    moving image: %d %s to row: %d, column: %d" \
             % (image.id, image.name, row, col)
         addedCount = addImageToPlate(conn, image, plate.id.val, col, row,
                                      removeFrom)
         # update row and column index
-        if firstAxisIsRow:
-            row += 1
-            if row >= axisCount:
-                row = scriptParams["Row_offset"]
-                col += 1
-        else:
-            col += 1
-            if col >= axisCount:
-                col = scriptParams["Column_offset"]
-                row += 1
+        row, col = update_index(
+            row, col, scriptParams["Row_offset"],
+            scriptParams["Column_offset"], axisCount, firstAxisIsRow
+        )
 
     # if user wanted to delete dataset, AND it's empty we can delete dataset
     deleteDataset = False   # Turning this functionality off for now.
@@ -322,21 +340,26 @@ client-tutorials/insight/insight-util-scripts.html""",
             values=rowColNaming,
             description="""Name plate rows with 'number' or 'letter'"""),
 
+        scripts.String(
+            "Wells_to_skip", grouping="6",
+            description="Comma separated list of wells to skip."
+            "Format: Row:Column,Row:Column,etc.", default=""),
+
         scripts.Int(
-            "Column_offset", grouping="6.1", default=0,
+            "Column_offset", grouping="7.1", default=0,
             description="Offset to first acquired column"),
 
         scripts.Int(
-            "Row_offset", grouping="6.2", default=0,
+            "Row_offset", grouping="7.2", default=0,
             description="Offset to first acquired row"),
 
         scripts.String(
-            "Screen", grouping="7",
+            "Screen", grouping="8",
             description="Option: put Plate(s) in a Screen. Enter Name of new"
             " screen or ID of existing screen"""),
 
         scripts.Bool(
-            "Remove_From_Dataset", grouping="8", default=True,
+            "Remove_From_Dataset", grouping="9", default=True,
             description="Remove Images from Dataset as they are added to"
             " Plate"),
 
