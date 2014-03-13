@@ -76,6 +76,18 @@ def addImageToPlate(conn, image, plateId, column, row, removeFrom=None):
     return True
 
 
+def natural_sort_by_key(list, key=lambda s: s):
+    """
+    http://stackoverflow.com/questions/4836710/\
+    does-python-have-a-built-in-function-for-string-natural-sort
+    """
+    def get_alphanum_key_func(key):
+        convert = lambda text: int(text) if text.isdigit() else text
+        return lambda s: [convert(c) for c in re.split('([0-9]+)', key(s))]
+    sort_key = get_alphanum_key_func(key)
+    return sorted(list, key=sort_key)
+
+
 def update_index(
     row, col, start_row, start_column, max_value, firstAxisIsRow
 ):
@@ -133,7 +145,10 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
         filterBy = scriptParams["Filter_Names"]
         print "Filtering images for names containing: %s" % filterBy
         images = [i for i in images if (i.getName().find(filterBy) >= 0)]
-    images.sort(key=lambda x: x.name.lower())
+    if scriptParams["Sorting"] == "alphanumeric":
+        images.sort(key=lambda x: x.name.lower())
+    if scriptParams["Sorting"] == "natural":
+        images = natural_sort_by_key(images, key=lambda x: x.name)
 
     # Do we try to remove images from Dataset and Delte Datset when/if empty?
     removeFrom = None
@@ -296,6 +311,7 @@ def runAsScript():
     dataTypes = [rstring('Dataset')]
     firstAxis = [rstring('column'), rstring('row')]
     rowColNaming = [rstring('letter'), rstring('number')]
+    sorting = [rstring('alphanumeric'), rstring('natural')]
 
     client = scripts.client(
         'Dataset_To_Plate.py',
@@ -341,25 +357,30 @@ client-tutorials/insight/insight-util-scripts.html""",
             description="""Name plate rows with 'number' or 'letter'"""),
 
         scripts.String(
-            "Wells_to_skip", grouping="6",
+            "Sorting", grouping="6", optional=False, default="natural",
+            description="Type of sorting to be perfromed on Image names",
+            values=sorting),
+
+        scripts.String(
+            "Wells_to_skip", grouping="7",
             description="Comma separated list of wells to skip."
             "Format: Row:Column,Row:Column,etc.", default=""),
 
         scripts.Int(
-            "Column_offset", grouping="7.1", default=0,
+            "Column_offset", grouping="8.1", default=0,
             description="Offset to first acquired column"),
 
         scripts.Int(
-            "Row_offset", grouping="7.2", default=0,
+            "Row_offset", grouping="8.2", default=0,
             description="Offset to first acquired row"),
 
         scripts.String(
-            "Screen", grouping="8",
+            "Screen", grouping="9",
             description="Option: put Plate(s) in a Screen. Enter Name of new"
             " screen or ID of existing screen"""),
 
         scripts.Bool(
-            "Remove_From_Dataset", grouping="9", default=True,
+            "Remove_From_Dataset", grouping="10", default=True,
             description="Remove Images from Dataset as they are added to"
             " Plate"),
 
