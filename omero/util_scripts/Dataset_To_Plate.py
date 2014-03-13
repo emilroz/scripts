@@ -76,30 +76,45 @@ def addImageToPlate(conn, image, plateId, column, row, removeFrom=None):
     return True
 
 
-def natural_sort_by_key(list, key=lambda s: s):
+def get_natural_sort_key(key):
     """
-    http://stackoverflow.com/questions/4836710/\
-    does-python-have-a-built-in-function-for-string-natural-sort
+    Get sorting key for natural alphanumeric sort.
+
+    @param key: index to sort by
     """
-    def get_alphanum_key_func(key):
-        convert = lambda text: int(text) if text.isdigit() else text
-        return lambda s: [convert(c) for c in re.split('([0-9]+)', key(s))]
-    sort_key = get_alphanum_key_func(key)
-    return sorted(list, key=sort_key)
+    convert = lambda text: int(text) if text.isdigit() else text
+    return lambda s: [convert(c) for c in re.split('([0-9]+)', key(s))]
 
 
 def update_index(
-    row, col, start_row, start_column, max_value, firstAxisIsRow
+    row, col, row_offset, col_offset, max_value, firstAxisIsRow
 ):
+    """
+    Update row and column index in dataset_to_plate().
+
+    @type row: int
+    @param row: current row index
+    @type col: int
+    @param col: current col index
+    @type row_offset: int
+    @param row_offset: row offset
+    @type col_offset: int
+    @param col_offset: column offset
+    @type max_value: int
+    @param max_value: number of Rows or Columns in the 'First Axis'
+    @type firstAxisIsRow: bool
+    @param firstAxisIsRow: are images arrange by row?
+    @return: updated row and column index
+    """
     if firstAxisIsRow:
         row += 1
         if row >= max_value:
-            row = start_row
+            row = row_offset
             col += 1
     else:
         col += 1
         if col >= max_value:
-            col = start_column
+            col = col_offset
             row += 1
     return row, col
 
@@ -132,8 +147,8 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
     print "Moving images from Dataset: %d %s to Plate: %d %s" \
         % (dataset.id, dataset.name, plate.id.val, plate.name.val)
 
-    row = scriptParams["Row_offset"]
-    col = scriptParams["Column_offset"]
+    row = scriptParams["Row_Offset"]
+    col = scriptParams["Column_Offset"]
 
     firstAxisIsRow = scriptParams["First_Axis"] == 'row'
     axisCount = scriptParams["First_Axis_Count"]
@@ -148,7 +163,7 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
     if scriptParams["Sorting"] == "alphanumeric":
         images.sort(key=lambda x: x.name.lower())
     if scriptParams["Sorting"] == "natural":
-        images = natural_sort_by_key(images, key=lambda x: x.name)
+        images.sort(key=get_natural_sort_key(key=lambda x: x.name))
 
     # Do we try to remove images from Dataset and Delte Datset when/if empty?
     removeFrom = None
@@ -156,13 +171,13 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
         scriptParams["Remove_From_Dataset"]
     if removeDataset:
         removeFrom = dataset
-    skip_list = scriptParams["Wells_to_skip"] + ","
+    skip_list = scriptParams["Wells_To_Skip"] + ","
     for image in images:
         check = "%i:%i," % (row + 1, col + 1)
         while re.search(check, skip_list) is not None:
             row, col = update_index(
-                row, col, scriptParams["Row_offset"],
-                scriptParams["Column_offset"], axisCount, firstAxisIsRow
+                row, col, scriptParams["Row_Offset"],
+                scriptParams["Column_Offset"], axisCount, firstAxisIsRow
             )
             check = "%i:%i" % (row + 1, col + 1)
         print "    moving image: %d %s to row: %d, column: %d" \
@@ -171,8 +186,8 @@ def dataset_to_plate(conn, scriptParams, datasetId, screen):
                                      removeFrom)
         # update row and column index
         row, col = update_index(
-            row, col, scriptParams["Row_offset"],
-            scriptParams["Column_offset"], axisCount, firstAxisIsRow
+            row, col, scriptParams["Row_Offset"],
+            scriptParams["Column_Offset"], axisCount, firstAxisIsRow
         )
 
     # if user wanted to delete dataset, AND it's empty we can delete dataset
@@ -362,16 +377,16 @@ client-tutorials/insight/insight-util-scripts.html""",
             values=sorting),
 
         scripts.String(
-            "Wells_to_skip", grouping="7",
-            description="Comma separated list of wells to skip."
+            "Wells_To_Skip", grouping="7",
+            description="Comma separated list of wells to skip. "
             "Format: Row:Column,Row:Column,etc.", default=""),
 
         scripts.Int(
-            "Column_offset", grouping="8.1", default=0,
+            "Column_Offset", grouping="8.1", default=0,
             description="Offset to first acquired column"),
 
         scripts.Int(
-            "Row_offset", grouping="8.2", default=0,
+            "Row_Offset", grouping="8.2", default=0,
             description="Offset to first acquired row"),
 
         scripts.String(
